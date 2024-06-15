@@ -136,27 +136,21 @@ class MockConnectionManager:
         self.autonomy_connection: WebSocket | None = None
 
     async def simulator_connect(self, websocket: WebSocket):
-        if self.simulator_connection == None:
-            await websocket.accept()
-            self.simulator_connection = websocket
-            await websocket.send_json(
-                {
-                    "type": "teams",
-                    "teams": [TEAM_NAME],
-                }
-            )
-        else:
-            logger.info("there is already a simulator ws connection")
+        if self.simulator_connection is not None:
+            logger.info("disconnecting previous connection")
             try:
                 await self.simulator_connection.close()
             except Exception as e:
                 logger.exception(e)
-            await websocket.accept()
-            self.simulator_connection = websocket
-
-    def simulator_disconnect(self):
-        logger.info("disconnecting previous connection")
-        self.simulator_connection = None
+            self.simulator_connection = None
+        await websocket.accept()
+        self.simulator_connection = websocket
+        await websocket.send_json(
+            {
+                "type": "teams",
+                "teams": [TEAM_NAME],
+            }
+        )
 
     async def team_connect(self, websocket: WebSocket):
         if self.team_connection == None:
@@ -226,7 +220,7 @@ async def team_endpoint(websocket: WebSocket, team_name: str):
     try:
         responses: List[Dict[str, Any]] = []
         for case in testcases:
-            with open(case["audio"], "rb") as file:
+            with open("simulator/data/audio/" + case["audio"], "rb") as file:
                 audio_bytes = file.read()
             # determine time between start and end
             start_time = time()
@@ -240,7 +234,7 @@ async def team_endpoint(websocket: WebSocket, team_name: str):
             results["elapsed"] = elapsed
             results["nlp_score"] = nlp_eval([case["truth"]], [results["nlp"]])
             results["vlm_score"] = vlm_eval([results["bbox"]], [results["vlm"]])
-            results["perf_score"] = 1 - min(10, elapsed) / 10
+            results["perf_score"] = 1 - min(30, elapsed) / 30
             results["score"] = (
                 0.45 * results["nlp_score"]
                 + 0.45 * results["vlm_score"]
